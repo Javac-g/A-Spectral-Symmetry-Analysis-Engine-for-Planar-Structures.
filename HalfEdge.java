@@ -1,6 +1,6 @@
-class HalfEdge {
-    Vertex origin;
-    HalfEdge twin;
-    HalfEdge next;
-    Face face;
+public class HalfEdge {
+    public Vertex origin;
+    public HalfEdge twin;
+    public HalfEdge next;
+    public Face face;
 }
