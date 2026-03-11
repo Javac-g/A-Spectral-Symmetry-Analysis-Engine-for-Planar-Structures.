@@ -1,3 +1,3 @@
-interface SubstitutionRule {
-    List<Tile> apply(Tile tile);
+public interface SubstitutionRule {
+    List<RhombTile> apply(RhombTile tile, double scale);
 }
