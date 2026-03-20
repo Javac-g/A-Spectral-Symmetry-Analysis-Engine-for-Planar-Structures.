@@ -9,10 +9,11 @@ import java.util.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.HashSet;
+import java.util.Set;
 
 public class OctahedronBoard {
 
@@ -22,14 +23,13 @@ public class OctahedronBoard {
     private final Map<Integer, TriangleCell> byId = new HashMap<>();
 
     private final int mineCount;
+    private boolean minesPlaced = false;
     private GameState state = GameState.READY;
 
     public OctahedronBoard(int level, double size, int mineCount) {
         this.mineCount = mineCount;
         buildCells(level, size);
         connectBySharedEdges();
-        placeMines(mineCount);
-        calculateNumbers();
     }
 
     private void buildCells(int level, double size) {
@@ -98,8 +98,8 @@ public class OctahedronBoard {
     private boolean shareEdge(TriangleCell a, TriangleCell b) {
         int shared = 0;
 
-        for (Vec3 va : verticesOf(a)) {
-            for (Vec3 vb : verticesOf(b)) {
+        for (Vec3 va : List.of(a.getA(), a.getB(), a.getC())) {
+            for (Vec3 vb : List.of(b.getA(), b.getB(), b.getC())) {
                 if (samePoint(va, vb)) {
                     shared++;
                     break;
@@ -110,33 +110,51 @@ public class OctahedronBoard {
         return shared >= 2;
     }
 
-    private List<Vec3> verticesOf(TriangleCell cell) {
-        return List.of(cell.getA(), cell.getB(), cell.getC());
-    }
-
     private boolean samePoint(Vec3 a, Vec3 b) {
         return a.distanceTo(b) < EPS;
     }
 
-    private void placeMines(int count) {
-        List<TriangleCell> shuffled = new ArrayList<>(cells);
-        Collections.shuffle(shuffled);
+    private void placeMinesAvoidingFirstClick(int safeId) {
+        Set<Integer> forbidden = new HashSet<>();
+        forbidden.add(safeId);
 
-        for (int i = 0; i < count && i < shuffled.size(); i++) {
-            shuffled.get(i).setMine(true);
+        TriangleCell safe = byId.get(safeId);
+        if (safe != null) {
+            for (TriangleCell neighbor : safe.getNeighbors()) {
+                forbidden.add(neighbor.getId());
+            }
         }
+
+        List<TriangleCell> candidates = new ArrayList<>();
+        for (TriangleCell cell : cells) {
+            if (!forbidden.contains(cell.getId())) {
+                candidates.add(cell);
+            }
+        }
+
+        Collections.shuffle(candidates);
+
+        int placed = 0;
+        for (TriangleCell cell : candidates) {
+            if (placed >= mineCount) {
+                break;
+            }
+            cell.setMine(true);
+            placed++;
+        }
+
+        calculateNumbers();
+        minesPlaced = true;
     }
 
     private void calculateNumbers() {
         for (TriangleCell cell : cells) {
             int mines = 0;
-
             for (TriangleCell neighbor : cell.getNeighbors()) {
                 if (neighbor.isMine()) {
                     mines++;
                 }
             }
-
             cell.setNeighborMines(mines);
         }
     }
@@ -149,6 +167,10 @@ public class OctahedronBoard {
         TriangleCell cell = byId.get(id);
         if (cell == null || cell.isFlagged() || cell.isRevealed()) {
             return;
+        }
+
+        if (!minesPlaced) {
+            placeMinesAvoidingFirstClick(id);
         }
 
         state = GameState.RUNNING;
@@ -214,11 +236,11 @@ public class OctahedronBoard {
         return mineCount;
     }
 
-    public Map<Integer, Integer> neighborStats() {
-        Map<Integer, Integer> stats = new LinkedHashMap<>();
-        for (TriangleCell cell : cells) {
-            stats.put(cell.getId(), cell.getNeighbors().size());
-        }
-        return stats;
+    public long getFlagCount() {
+        return cells.stream().filter(TriangleCell::isFlagged).count();
+    }
+
+    public boolean isMinesPlaced() {
+        return minesPlaced;
     }
 }
